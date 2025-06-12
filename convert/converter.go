@@ -556,6 +556,10 @@ func ConvertsV2Ray(buf []byte) ([]map[string]any, error) {
 			socks["password"] = password
 			socks["skip-cert-verify"] = true
 
+			if scheme == "https" {
+				socks["tls"] = true
+			}
+
 			proxies = append(proxies, socks)
 
 		case "anytls":
