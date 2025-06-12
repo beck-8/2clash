@@ -594,6 +594,7 @@ func ConvertsV2Ray(buf []byte) ([]map[string]any, error) {
 			anytls["password"] = password
 			anytls["sni"] = sni
 			anytls["skip-cert-verify"] = insecureBool
+			anytls["udp"] = true
 
 			proxies = append(proxies, anytls)
 		}
