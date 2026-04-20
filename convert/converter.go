@@ -245,6 +245,9 @@ func ConvertsV2Ray(buf []byte) ([]map[string]any, error) {
 				wsOpts := make(map[string]any)
 
 				headers["User-Agent"] = RandUserAgent()
+				if host := query.Get("host"); host != "" {
+					headers["Host"] = host
+				}
 
 				wsOpts["path"] = query.Get("path")
 				wsOpts["headers"] = headers
