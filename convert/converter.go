@@ -615,9 +615,11 @@ func ConvertsV2Ray(buf []byte) ([]map[string]any, error) {
 			if portStr == "" {
 				continue
 			}
-			insecure, sni := query.Get("insecure"), query.Get("sni")
-			insecureBool := insecure == "1"
+			sni := query.Get("sni")
 			fingerprint := query.Get("hpkp")
+			if fingerprint == "" {
+				fingerprint = query.Get("pcs")
+			}
 
 			remarks := link.Fragment
 			if remarks == "" {
@@ -633,8 +635,21 @@ func ConvertsV2Ray(buf []byte) ([]map[string]any, error) {
 			anytls["password"] = password
 			anytls["sni"] = sni
 			anytls["fingerprint"] = fingerprint
-			anytls["skip-cert-verify"] = insecureBool
 			anytls["udp"] = true
+			for _, k := range [...]string{"allow_insecure", "allowInsecure", "insecure"} {
+				if query.Get(k) == "1" {
+					anytls["skip-cert-verify"] = true
+					break
+				}
+			}
+			if alpn := query.Get("alpn"); alpn != "" {
+				anytls["alpn"] = strings.Split(alpn, ",")
+			}
+			if fp := query.Get("fp"); fp != "" {
+				anytls["client-fingerprint"] = fp
+			}
+			// mihomo's anytls outbound does not yet support reality-opts; enable once upstream lands it.
+			// applyRealityOpts(query, anytls)
 
 			proxies = append(proxies, anytls)
 
