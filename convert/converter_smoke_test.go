@@ -169,3 +169,71 @@ func TestHy2TFO(t *testing.T) {
 		t.Errorf("tfo: got %v, want true", proxies[0]["tfo"])
 	}
 }
+
+func TestHy2AnonymousPortHopping(t *testing.T) {
+	// No auth in URL, but port is a range — must still parse and emit `ports`.
+	url := "hy2://server.com:443-500/#n"
+	proxies, err := ConvertsV2Ray([]byte(url))
+	if err != nil || len(proxies) != 1 {
+		t.Fatalf("parse failed: err=%v proxies=%+v", err, proxies)
+	}
+	p := proxies[0]
+	if p["port"] != "443" {
+		t.Errorf("port: got %v, want 443", p["port"])
+	}
+	if p["ports"] != "443-500" {
+		t.Errorf("ports: got %v, want 443-500", p["ports"])
+	}
+}
+
+func TestAnytlsHpkpPcsFallback(t *testing.T) {
+	// hpkp takes precedence when present.
+	url := "anytls://pw@server:443?hpkp=OLDPIN&pcs=NEWPIN#n"
+	proxies, _ := ConvertsV2Ray([]byte(url))
+	if proxies[0]["fingerprint"] != "OLDPIN" {
+		t.Errorf("hpkp preferred: got %v", proxies[0]["fingerprint"])
+	}
+	// When hpkp missing, fall back to pcs.
+	url2 := "anytls://pw@server:443?pcs=NEWPIN#n"
+	proxies2, _ := ConvertsV2Ray([]byte(url2))
+	if proxies2[0]["fingerprint"] != "NEWPIN" {
+		t.Errorf("pcs fallback: got %v", proxies2[0]["fingerprint"])
+	}
+}
+
+func TestAnytlsNoUsernameField(t *testing.T) {
+	// mihomo's AnyTLSOption has no `username` field — emitting it is dead data.
+	url := "anytls://pw@server:443#n"
+	proxies, _ := ConvertsV2Ray([]byte(url))
+	if _, ok := proxies[0]["username"]; ok {
+		t.Errorf("anytls must not emit username field: %+v", proxies[0])
+	}
+}
+
+func TestTrojanAllowInsecureFalse(t *testing.T) {
+	// allowInsecure=0 must not set skip-cert-verify.
+	url := "trojan://pw@server:443?allowInsecure=0#n"
+	proxies, _ := ConvertsV2Ray([]byte(url))
+	if v, ok := proxies[0]["skip-cert-verify"]; ok && v == true {
+		t.Errorf("skip-cert-verify should not be true for allowInsecure=0, got %v", v)
+	}
+}
+
+func TestTuicBoolTolerant(t *testing.T) {
+	// After unifying on ParseBool, `true` (lowercase) must work too — not just `1`.
+	url := "tuic://uuid:pw@server:443?fast_open=true&reduce_rtt=TRUE&allow_insecure=true#n"
+	proxies, err := ConvertsV2Ray([]byte(url))
+	if err != nil || len(proxies) != 1 {
+		t.Fatalf("parse failed: %v", err)
+	}
+	p := proxies[0]
+	if p["fast-open"] != true {
+		t.Errorf("fast-open (from fast_open=true): got %v", p["fast-open"])
+	}
+	if p["reduce-rtt"] != true {
+		t.Errorf("reduce-rtt (from reduce_rtt=TRUE): got %v", p["reduce-rtt"])
+	}
+	if p["skip-cert-verify"] != true {
+		t.Errorf("skip-cert-verify (from allow_insecure=true): got %v", p["skip-cert-verify"])
+	}
+}
