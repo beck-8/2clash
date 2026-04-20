@@ -134,6 +134,12 @@ func ConvertsV2Ray(buf []byte) ([]map[string]any, error) {
 			} else if hop := query.Get("hop_interval"); hop != "" {
 				hysteria2["hop-interval"] = hop
 			}
+			for _, k := range [...]string{"fastopen", "fast_open", "fast-open"} {
+				if b, _ := strconv.ParseBool(query.Get(k)); b {
+					hysteria2["tfo"] = true
+					break
+				}
+			}
 
 			proxies = append(proxies, hysteria2)
 
