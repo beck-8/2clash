@@ -219,6 +219,106 @@ func TestTrojanAllowInsecureFalse(t *testing.T) {
 	}
 }
 
+func TestTuicPasswordEscapedColon(t *testing.T) {
+	// v2rayN-style URL with `%3A` (colon) inside password — url.User.Password() must decode it.
+	url := "tuic://uuid:pass%3Aword@server:443?alpn=h3,hq-29&allow-insecure=1&fast-open=1&congestion-control=bbr#n"
+	proxies, err := ConvertsV2Ray([]byte(url))
+	if err != nil || len(proxies) != 1 {
+		t.Fatalf("parse failed: %v", err)
+	}
+	if proxies[0]["password"] != "pass:word" {
+		t.Errorf("password: got %v, want pass:word", proxies[0]["password"])
+	}
+	if proxies[0]["uuid"] != "uuid" {
+		t.Errorf("uuid: got %v", proxies[0]["uuid"])
+	}
+}
+
+func TestTrojanRealityWithSpx(t *testing.T) {
+	// spx (spider-x) is emitted by some clients but mihomo doesn't support it — must be dropped silently
+	// and REALITY must still work on pbk/sid.
+	url := "trojan://pw@server:443?type=grpc&serviceName=svc&security=reality&pbk=PK&sid=SID&spx=%2Fspider#n"
+	proxies, err := ConvertsV2Ray([]byte(url))
+	if err != nil || len(proxies) != 1 {
+		t.Fatalf("parse failed: %v", err)
+	}
+	p := proxies[0]
+	ro, ok := p["reality-opts"].(map[string]any)
+	if !ok {
+		t.Fatalf("reality-opts missing: %+v", p)
+	}
+	if ro["public-key"] != "PK" || ro["short-id"] != "SID" {
+		t.Errorf("reality-opts wrong: %+v", ro)
+	}
+	if _, hasSpx := ro["spider-x"]; hasSpx {
+		t.Errorf("spider-x must not be emitted (mihomo doesn't support it)")
+	}
+	if _, hasSpx := p["spx"]; hasSpx {
+		t.Errorf("spx leak into top-level proxy map: %+v", p)
+	}
+}
+
+func TestHy2MportMultiRange(t *testing.T) {
+	// Mixed comma-separated list with embedded range, via mport param.
+	url := "hy2://pw@server:443?mport=9000,9002-9004#n"
+	proxies, err := ConvertsV2Ray([]byte(url))
+	if err != nil || len(proxies) != 1 {
+		t.Fatalf("parse failed: %v", err)
+	}
+	if proxies[0]["ports"] != "9000,9002-9004" {
+		t.Errorf("ports: got %v, want 9000,9002-9004", proxies[0]["ports"])
+	}
+	if proxies[0]["port"] != "443" {
+		t.Errorf("port: got %v, want 443", proxies[0]["port"])
+	}
+}
+
+func TestVlessXhttpExtra(t *testing.T) {
+	// VLESS over xhttp with a JSON `extra` payload carrying downloadSettings — exercises handleVShareLink + parseXHTTPExtra.
+	url := `vless://12345678-1234-1234-1234-123456789abc@example.com:443?security=tls&encryption=none&type=xhttp&host=cdn.example.com&path=%2Fxhttp&mode=stream-up&sni=example.com&extra=%7B%22downloadSettings%22%3A%7B%22address%22%3A%22dl.example.com%22%2C%22port%22%3A8443%2C%22security%22%3A%22tls%22%7D%7D#x`
+	proxies, err := ConvertsV2Ray([]byte(url))
+	if err != nil || len(proxies) != 1 {
+		t.Fatalf("parse failed: %v", err)
+	}
+	p := proxies[0]
+	if p["network"] != "xhttp" {
+		t.Errorf("network: got %v, want xhttp", p["network"])
+	}
+	xhttpOpts, ok := p["xhttp-opts"].(map[string]any)
+	if !ok {
+		t.Fatalf("xhttp-opts missing: %+v", p)
+	}
+	if xhttpOpts["mode"] != "stream-up" {
+		t.Errorf("mode: got %v", xhttpOpts["mode"])
+	}
+	ds, ok := xhttpOpts["download-settings"].(map[string]any)
+	if !ok {
+		t.Fatalf("download-settings missing: %+v", xhttpOpts)
+	}
+	if ds["server"] != "dl.example.com" {
+		t.Errorf("download-settings.server: got %v", ds["server"])
+	}
+	if ds["port"] != 8443 {
+		t.Errorf("download-settings.port: got %v (type %T)", ds["port"], ds["port"])
+	}
+}
+
+func TestAnytlsMultiAlpn(t *testing.T) {
+	// Two ALPN values, comma-separated — must split into []string.
+	url := "anytls://pw@server:443?alpn=h2,http/1.1&sni=x&fp=chrome#n"
+	proxies, err := ConvertsV2Ray([]byte(url))
+	if err != nil || len(proxies) != 1 {
+		t.Fatalf("parse failed: %v", err)
+	}
+	alpn, ok := proxies[0]["alpn"].([]string)
+	if !ok {
+		t.Fatalf("alpn missing or wrong type: %+v", proxies[0]["alpn"])
+	}
+	if len(alpn) != 2 || alpn[0] != "h2" || alpn[1] != "http/1.1" {
+		t.Errorf("alpn: got %v, want [h2 http/1.1]", alpn)
+	}
+}
+
 func TestTuicBoolTolerant(t *testing.T) {
 	// After unifying on ParseBool, `true` (lowercase) must work too — not just `1`.
 	url := "tuic://uuid:pw@server:443?fast_open=true&reduce_rtt=TRUE&allow_insecure=true#n"
