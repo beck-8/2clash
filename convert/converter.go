@@ -182,6 +182,18 @@ func ConvertsV2Ray(buf []byte) ([]map[string]any, error) {
 					break
 				}
 			}
+			for _, k := range [...]string{"fast_open", "fast-open", "fastopen"} {
+				if query.Get(k) == "1" {
+					tuic["fast-open"] = true
+					break
+				}
+			}
+			for _, k := range [...]string{"reduce_rtt", "reduce-rtt"} {
+				if query.Get(k) == "1" {
+					tuic["reduce-rtt"] = true
+					break
+				}
+			}
 
 			proxies = append(proxies, tuic)
 
