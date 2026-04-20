@@ -6,11 +6,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/metacubex/mihomo/log"
 )
+
+// hy2PortHopRe matches a hysteria2/hy2 URL with port-hopping syntax in the authority,
+// e.g. `hy2://pw@host:443-500,600/`. Captures: (1) prefix up through host, (2) port-spec, (3) suffix.
+// Non-port-hopping URLs (single digit port, IPv6, etc.) don't match and fall through.
+var hy2PortHopRe = regexp.MustCompile(`^((?:hysteria2|hy2)://[^@]*@[^:]+):(\d+(?:-\d+)?(?:[,;]\d+(?:-\d+)?)*)(.*)$`)
 
 // ConvertsV2Ray convert V2Ray subscribe proxies data to mihomo proxies config
 func ConvertsV2Ray(buf []byte) ([]map[string]any, error) {
@@ -70,7 +76,20 @@ func ConvertsV2Ray(buf []byte) ([]map[string]any, error) {
 			proxies = append(proxies, hysteria)
 
 		case "hysteria2", "hy2":
-			urlHysteria2, err := url.Parse(line)
+			// Extract port-hopping spec (e.g. `443-500,600`) before url.Parse, which rejects non-digit ports.
+			var portsSpec string
+			normalized := line
+			if m := hy2PortHopRe.FindStringSubmatch(line); m != nil && strings.ContainsAny(m[2], "-,;") {
+				portsSpec = m[2]
+				// Pick the first single port from the spec for the initial connect.
+				first := strings.FieldsFunc(portsSpec, func(r rune) bool { return r == ',' || r == ';' })[0]
+				if dash := strings.IndexByte(first, '-'); dash >= 0 {
+					first = first[:dash]
+				}
+				normalized = m[1] + ":" + first + m[3]
+			}
+
+			urlHysteria2, err := url.Parse(normalized)
 			if err != nil {
 				continue
 			}
@@ -87,9 +106,19 @@ func ConvertsV2Ray(buf []byte) ([]map[string]any, error) {
 			} else {
 				hysteria2["port"] = "443"
 			}
+			if portsSpec == "" {
+				portsSpec = query.Get("mport")
+			}
+			if portsSpec != "" {
+				hysteria2["ports"] = portsSpec
+			}
 			hysteria2["obfs"] = query.Get("obfs")
 			hysteria2["obfs-password"] = query.Get("obfs-password")
-			hysteria2["sni"] = query.Get("sni")
+			sni := query.Get("sni")
+			if sni == "" {
+				sni = query.Get("peer")
+			}
+			hysteria2["sni"] = sni
 			hysteria2["skip-cert-verify"], _ = strconv.ParseBool(query.Get("insecure"))
 			if alpn := query.Get("alpn"); alpn != "" {
 				hysteria2["alpn"] = strings.Split(alpn, ",")
@@ -100,6 +129,11 @@ func ConvertsV2Ray(buf []byte) ([]map[string]any, error) {
 			hysteria2["fingerprint"] = query.Get("pinSHA256")
 			hysteria2["down"] = query.Get("down")
 			hysteria2["up"] = query.Get("up")
+			if hop := query.Get("hop-interval"); hop != "" {
+				hysteria2["hop-interval"] = hop
+			} else if hop := query.Get("hop_interval"); hop != "" {
+				hysteria2["hop-interval"] = hop
+			}
 
 			proxies = append(proxies, hysteria2)
 
