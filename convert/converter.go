@@ -16,7 +16,7 @@ import (
 // hy2PortHopRe matches a hysteria2/hy2 URL with port-hopping syntax in the authority,
 // e.g. `hy2://pw@host:443-500,600/`. Captures: (1) prefix up through host, (2) port-spec, (3) suffix.
 // Non-port-hopping URLs (single digit port, IPv6, etc.) don't match and fall through.
-var hy2PortHopRe = regexp.MustCompile(`^((?:hysteria2|hy2)://[^@]*@[^:]+):(\d+(?:-\d+)?(?:[,;]\d+(?:-\d+)?)*)(.*)$`)
+var hy2PortHopRe = regexp.MustCompile(`^((?:hysteria2|hy2)://(?:[^@]*@)?[^:]+):(\d+(?:-\d+)?(?:[,;]\d+(?:-\d+)?)*)(.*)$`)
 
 // ConvertsV2Ray convert V2Ray subscribe proxies data to mihomo proxies config
 func ConvertsV2Ray(buf []byte) ([]map[string]any, error) {
@@ -686,7 +686,6 @@ func ConvertsV2Ray(buf []byte) ([]map[string]any, error) {
 			anytls["type"] = "anytls"
 			anytls["server"] = server
 			anytls["port"] = portStr
-			anytls["username"] = username
 			anytls["password"] = password
 			anytls["sni"] = sni
 			anytls["fingerprint"] = fingerprint
