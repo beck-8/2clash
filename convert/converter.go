@@ -183,19 +183,19 @@ func ConvertsV2Ray(buf []byte) ([]map[string]any, error) {
 				tuic["udp-relay-mode"] = udpRelayMode
 			}
 			for _, k := range [...]string{"allow_insecure", "allowInsecure", "insecure"} {
-				if query.Get(k) == "1" {
+				if b, _ := strconv.ParseBool(query.Get(k)); b {
 					tuic["skip-cert-verify"] = true
 					break
 				}
 			}
 			for _, k := range [...]string{"fast_open", "fast-open", "fastopen"} {
-				if query.Get(k) == "1" {
+				if b, _ := strconv.ParseBool(query.Get(k)); b {
 					tuic["fast-open"] = true
 					break
 				}
 			}
 			for _, k := range [...]string{"reduce_rtt", "reduce-rtt"} {
-				if query.Get(k) == "1" {
+				if b, _ := strconv.ParseBool(query.Get(k)); b {
 					tuic["reduce-rtt"] = true
 					break
 				}
@@ -691,7 +691,7 @@ func ConvertsV2Ray(buf []byte) ([]map[string]any, error) {
 			anytls["fingerprint"] = fingerprint
 			anytls["udp"] = true
 			for _, k := range [...]string{"allow_insecure", "allowInsecure", "insecure"} {
-				if query.Get(k) == "1" {
+				if b, _ := strconv.ParseBool(query.Get(k)); b {
 					anytls["skip-cert-verify"] = true
 					break
 				}
