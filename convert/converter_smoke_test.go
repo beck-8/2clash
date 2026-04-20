@@ -121,3 +121,51 @@ func TestTrojanReality(t *testing.T) {
 		t.Errorf("reality-opts wrong: %+v", ro)
 	}
 }
+
+func TestTrojanWSHost(t *testing.T) {
+	url := "trojan://pw@server:443?type=ws&host=ws.example.com&path=/p#n"
+	proxies, err := ConvertsV2Ray([]byte(url))
+	if err != nil || len(proxies) != 1 {
+		t.Fatalf("parse failed: %v", err)
+	}
+	wsOpts, ok := proxies[0]["ws-opts"].(map[string]any)
+	if !ok {
+		t.Fatalf("ws-opts missing: %+v", proxies[0])
+	}
+	if wsOpts["path"] != "/p" {
+		t.Errorf("ws path: got %v, want /p", wsOpts["path"])
+	}
+	headers, _ := wsOpts["headers"].(map[string]any)
+	if headers["Host"] != "ws.example.com" {
+		t.Errorf("ws Host: got %v, want ws.example.com", headers["Host"])
+	}
+}
+
+func TestTuicP2(t *testing.T) {
+	url := "tuic://uuid:pw@server:443?fast_open=1&reduce-rtt=1&congestion_control=bbr#n"
+	proxies, err := ConvertsV2Ray([]byte(url))
+	if err != nil || len(proxies) != 1 {
+		t.Fatalf("parse failed: %v", err)
+	}
+	p := proxies[0]
+	if p["fast-open"] != true {
+		t.Errorf("fast-open: got %v, want true", p["fast-open"])
+	}
+	if p["reduce-rtt"] != true {
+		t.Errorf("reduce-rtt: got %v, want true", p["reduce-rtt"])
+	}
+	if p["congestion-controller"] != "bbr" {
+		t.Errorf("congestion-controller: got %v", p["congestion-controller"])
+	}
+}
+
+func TestHy2TFO(t *testing.T) {
+	url := "hy2://pw@server:443?fastopen=true#n"
+	proxies, err := ConvertsV2Ray([]byte(url))
+	if err != nil || len(proxies) != 1 {
+		t.Fatalf("parse failed: %v", err)
+	}
+	if proxies[0]["tfo"] != true {
+		t.Errorf("tfo: got %v, want true", proxies[0]["tfo"])
+	}
+}
