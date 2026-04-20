@@ -402,3 +402,14 @@ func parseXHTTPExtra(extra map[string]any, opts map[string]any) {
 		}
 	}
 }
+
+// applyRealityOpts writes reality-opts into proxy when the URL query carries a `pbk`.
+// Used by share-link parsers (trojan, anytls) that don't go through handleVShareLink.
+func applyRealityOpts(query url.Values, proxy map[string]any) {
+	if pbk := query.Get("pbk"); pbk != "" {
+		proxy["reality-opts"] = map[string]any{
+			"public-key": pbk,
+			"short-id":   query.Get("sid"),
+		}
+	}
+}

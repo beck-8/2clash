@@ -168,7 +168,12 @@ func ConvertsV2Ray(buf []byte) ([]map[string]any, error) {
 			trojan["port"] = urlTrojan.Port()
 			trojan["password"] = urlTrojan.User.Username()
 			trojan["udp"] = true
-			trojan["skip-cert-verify"], _ = strconv.ParseBool(query.Get("allowInsecure"))
+			for _, k := range [...]string{"allow_insecure", "allowInsecure", "insecure"} {
+				if b, _ := strconv.ParseBool(query.Get(k)); b {
+					trojan["skip-cert-verify"] = true
+					break
+				}
+			}
 
 			if sni := query.Get("sni"); sni != "" {
 				trojan["sni"] = sni
@@ -209,6 +214,7 @@ func ConvertsV2Ray(buf []byte) ([]map[string]any, error) {
 			if pcs := query.Get("pcs"); pcs != "" {
 				trojan["fingerprint"] = pcs
 			}
+			applyRealityOpts(query, trojan)
 
 			proxies = append(proxies, trojan)
 
